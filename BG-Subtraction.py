@@ -10,6 +10,7 @@ import numpy as np
 import cv2
 import time as tm
 import argparse
+import progressbar
 
 parser = argparse.ArgumentParser()
 parser.add_argument("VID_PATH", help="Path to the video to be summarized")
@@ -19,7 +20,12 @@ args = parser.parse_args()
 
 VID_PATH = args.VID_PATH
 
-CONTINUITY_THRESHOLD = 10 #For cutting out boxes
+cap  = cv2.VideoCapture(VID_PATH)
+
+fps = int(cap.get(cv2.CAP_PROP_FPS))
+total_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+
+CONTINUITY_THRESHOLD = fps #For cutting out boxes
 
 MIN_SECONDS = 2 # (seconds) Minimum duration of a moving object
 INTERVAL_BW_DIVISIONS = 10 # (seconds) For distributing moving objects over a duration to reduce overlapping.
@@ -35,8 +41,6 @@ if args.INTERVAL_BW_DIVISIONS:
 
 """Will give boxes for each frame and simultaneously extract background"""
 
-cap  = cv2.VideoCapture(VID_PATH)
-fps = int(cap.get(cv2.CAP_PROP_FPS))
 fgbg = cv2.createBackgroundSubtractorKNN()
 
 ret, frame = cap.read()
@@ -44,36 +48,45 @@ all_conts = []
 
 avg2 = np.float32(frame) #BG-Ext
 
-while ret:
-    
-    #Background extraction
-    try:
-        cv2.accumulateWeighted(frame, avg2, 0.01)
-    except:
-        break
-    #if ret is true than no error with cap.isOpened
-    ret, frame = cap.read()
-    
-    if ret==True:
-        #apply background substraction
-        fgmask = fgbg.apply(frame)  
+fcount = -1
+
+print("Extracting bounding boxes and background...")
+
+with progressbar.ProgressBar(max_value=total_frames) as bar:
+    while ret:
         
-        #apply contours on foreground
-        (contours, hierarchy) = cv2.findContours(fgmask.copy(), cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
-        
-        contours = np.array([np.array(cv2.boundingRect(c)) for c in contours if cv2.contourArea(c) >= 500])
-        all_conts.append(contours)
-        for c in contours:
-            
-            #get bounding box from countour
-            (x, y, w, h) = c
-            
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-        
-#         cv2.imshow('rgb', frame)
-        
-        if cv2.waitKey(1) & 0xFF == ord("q"):
+        fcount += 1
+
+        bar.update(fcount)
+
+        #Background extraction
+        try:
+            cv2.accumulateWeighted(frame, avg2, 0.01)
+        except:
             break
+        #if ret is true than no error with cap.isOpened
+        ret, frame = cap.read()
+        
+        if ret==True:
+            #apply background substraction
+            fgmask = fgbg.apply(frame)  
+            
+            #apply contours on foreground
+            (contours, hierarchy) = cv2.findContours(fgmask.copy(), cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+            
+            contours = np.array([np.array(cv2.boundingRect(c)) for c in contours if cv2.contourArea(c) >= 500])
+            all_conts.append(contours)
+            for c in contours:
+                
+                #get bounding box from countour
+                (x, y, w, h) = c
+                
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            
+    #         cv2.imshow('rgb', frame)
+            
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
 
 cap.release()
 cv2.destroyAllWindows()
@@ -123,6 +136,7 @@ class moving_obj:
 #old - boxes in the previous frame
 #new - boxes in the current frame
 
+print("Associating boxes into objects...")
 
 moving_objs = []
 
@@ -222,29 +236,40 @@ ret, frame = cap.read() #original video
 all_texts = []
 
 vid_time = -1
-while ret:
-    vid_time += 1
-    ret, frame = cap.read()
+
+fcount = -1
+
+print("Cropping moving objects from the main video and overlay them on the bakground....")
+
+with progressbar.ProgressBar(max_value=total_frames) as bar:
     
-    if ret==True:
+    while ret:
         
-        for obj_idx, mving_obj in enumerate(moving_objs):
-            if mving_obj.boxes: #non-empty
-                first_box = mving_obj.boxes[0]
-                
-                if(first_box.time == vid_time):
-                    final_time = first_box.time - start_times[obj_idx] + int(int(start_times[obj_idx]/int(INTERVAL_BW_DIVISIONS*fps))*GAP_BW_DIVISIONS*fps)
+        fcount += 1
+        bar.update(fcount)
+
+        vid_time += 1
+        ret, frame = cap.read()
+        
+        if ret==True:
+            
+            for obj_idx, mving_obj in enumerate(moving_objs):
+                if mving_obj.boxes: #non-empty
+                    first_box = mving_obj.boxes[0]
                     
-                    overlay(final_video[final_time-1], frame, first_box.coords)
-                    (x, y, w, h) = first_box.coords
-                    
-                    #TODO: DESIGN
-#                     all_texts.append((final_time-1, frame2HMS(first_box.time, fps), (x, y-10))) #Above
-                    all_texts.append((final_time-1, frame2HMS(first_box.time, fps), (x+int(w/2), y+int(h/2)))) #Centre
-    
-                    del(mving_obj.boxes[0])
-        if cv2.waitKey(1) & 0xFF == ord("q"):
-            break
+                    if(first_box.time == vid_time):
+                        final_time = first_box.time - start_times[obj_idx] + int(int(start_times[obj_idx]/int(INTERVAL_BW_DIVISIONS*fps))*GAP_BW_DIVISIONS*fps)
+                        
+                        overlay(final_video[final_time-1], frame, first_box.coords)
+                        (x, y, w, h) = first_box.coords
+                        
+                        #TODO: DESIGN
+    #                     all_texts.append((final_time-1, frame2HMS(first_box.time, fps), (x, y-10))) #Above
+                        all_texts.append((final_time-1, frame2HMS(first_box.time, fps), (x+int(w/2), y+int(h/2)))) #Centre
+        
+                        del(mving_obj.boxes[0])
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
 
 cap.release()
 cv2.destroyAllWindows()
@@ -262,6 +287,8 @@ for (t, text, org) in all_texts:
 
 # In[109]:
 
+print("Writing recap video...")
+
 filename = os.path.basename(VID_PATH).split('.')[0]
 out = cv2.VideoWriter(filename+'_summary.avi',cv2.VideoWriter_fourcc(*'DIVX'), fps, (background.shape[1],background.shape[0]))
 
@@ -276,6 +303,7 @@ out.release()
 cv2.destroyAllWindows()
 cap.release()
 
+print("Done!!")
 
 # In[ ]:
 
