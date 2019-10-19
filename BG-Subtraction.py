@@ -25,9 +25,10 @@ cap  = cv2.VideoCapture(VID_PATH)
 fps = int(cap.get(cv2.CAP_PROP_FPS))
 total_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
 
-CONTINUITY_THRESHOLD = fps #For cutting out boxes
+CONTINUITY_THRESHOLD = fps   #For cutting out boxes
 
 MIN_SECONDS = 2 # (seconds) Minimum duration of a moving object
+
 INTERVAL_BW_DIVISIONS = 10 # (seconds) For distributing moving objects over a duration to reduce overlapping.
 GAP_BW_DIVISIONS = 1.5 #(seconds)
 
@@ -53,6 +54,9 @@ fcount = -1
 print("Extracting bounding boxes and background...")
 
 with progressbar.ProgressBar(max_value=total_frames) as bar:
+    
+    counter = 1
+
     while ret:
         
         fcount += 1
@@ -61,7 +65,9 @@ with progressbar.ProgressBar(max_value=total_frames) as bar:
 
         #Background extraction
         try:
-            cv2.accumulateWeighted(frame, avg2, 0.01)
+            # cv2.accumulateWeighted(frame, avg2, 0.01)
+            cv2.accumulate(frame, avg2)
+            counter += 1
         except:
             break
         #if ret is true than no error with cap.isOpened
@@ -90,16 +96,24 @@ with progressbar.ProgressBar(max_value=total_frames) as bar:
 
 cap.release()
 cv2.destroyAllWindows()
-background = cv2.convertScaleAbs(avg2)
+background = cv2.convertScaleAbs(avg2/counter)
 
 
 # ## Object tracking 
 
 # In[4]:
 
+def get_centres(p1):
+    return np.transpose(np.array([p1[:,0] + p1[:,2]/2, p1[:,1] + p1[:,3]/2]))
 
 def distance(p1, p2):
-    return np.linalg.norm(p1 - p2, axis=1)
+    p1 = np.expand_dims(p1, 0)
+    if p2.ndim==1:
+        p2 = np.expand_dims(p2, 0)
+        
+    c1 = get_centres(p1)
+    c2 = get_centres(p2)
+    return np.linalg.norm(c1 - c2, axis=1)
 
 def get_nearest(p1, points):
     """returns index of the point in *points* that is closest to p1"""
@@ -194,7 +208,7 @@ def cut(image, coords):
 
 def overlay(frame, image, coords):
     (x, y, w, h) = coords
-    frame[y:y+h,x:x+w] = cut(image, coords)
+    frame[y:y+h,x:x+w] = cv2.addWeighted(frame[y:y+h,x:x+w],0.5,cut(image, coords),0.5,0)
 
 
 # In[104]:
@@ -280,7 +294,7 @@ cv2.destroyAllWindows()
 
 #annotating moving objects
 for (t, text, org) in all_texts:
-    cv2.putText(final_video[t], text, org, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (252, 240,3 ), 1)
+    cv2.putText(final_video[t], text, org, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (252, 240,3 ), 2)
     #TODO: DESIGN
 
 # ## Final video
