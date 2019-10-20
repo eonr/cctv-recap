@@ -25,12 +25,12 @@ cap  = cv2.VideoCapture(VID_PATH)
 fps = int(cap.get(cv2.CAP_PROP_FPS))
 total_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
 
-CONTINUITY_THRESHOLD = fps   #For cutting out boxes
+CONTINUITY_THRESHOLD = fps*2 #For cutting out boxes
 
-MIN_SECONDS = 2 # (seconds) Minimum duration of a moving object
+MIN_SECONDS =  4# (seconds) Minimum duration of a moving object
 
 INTERVAL_BW_DIVISIONS = 10 # (seconds) For distributing moving objects over a duration to reduce overlapping.
-GAP_BW_DIVISIONS = 1.5 #(seconds)
+GAP_BW_DIVISIONS = 0.25 #(seconds)
 
 if args.INTERVAL_BW_DIVISIONS:
     INTERVAL_BW_DIVISIONS = args.INTERVAL_BW_DIVISIONS
@@ -54,9 +54,6 @@ fcount = -1
 print("Extracting bounding boxes and background...")
 
 with progressbar.ProgressBar(max_value=total_frames) as bar:
-    
-    counter = 1
-
     while ret:
         
         fcount += 1
@@ -65,9 +62,7 @@ with progressbar.ProgressBar(max_value=total_frames) as bar:
 
         #Background extraction
         try:
-            # cv2.accumulateWeighted(frame, avg2, 0.01)
-            cv2.accumulate(frame, avg2)
-            counter += 1
+            cv2.accumulateWeighted(frame, avg2, 0.01)
         except:
             break
         #if ret is true than no error with cap.isOpened
@@ -80,7 +75,7 @@ with progressbar.ProgressBar(max_value=total_frames) as bar:
             #apply contours on foreground
             (contours, hierarchy) = cv2.findContours(fgmask.copy(), cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
             
-            contours = np.array([np.array(cv2.boundingRect(c)) for c in contours if cv2.contourArea(c) >= 500])
+            contours = np.array([np.array(cv2.boundingRect(c)) for c in contours if cv2.contourArea(c) >= 8000])
             all_conts.append(contours)
             for c in contours:
                 
@@ -89,14 +84,14 @@ with progressbar.ProgressBar(max_value=total_frames) as bar:
                 
                 cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
             
-    #         cv2.imshow('rgb', frame)
+            cv2.imshow('rgb', frame)
             
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
-
+            # tm.sleep(1/45)
 cap.release()
 cv2.destroyAllWindows()
-background = cv2.convertScaleAbs(avg2/counter)
+background = cv2.convertScaleAbs(avg2)
 
 
 # ## Object tracking 
@@ -209,6 +204,7 @@ def cut(image, coords):
 def overlay(frame, image, coords):
     (x, y, w, h) = coords
     frame[y:y+h,x:x+w] = cv2.addWeighted(frame[y:y+h,x:x+w],0.5,cut(image, coords),0.5,0)
+
 
 
 # In[104]:
