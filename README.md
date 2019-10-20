@@ -10,7 +10,8 @@ In the modern times of security, Surveillance cameras are making their way into 
 
 CCTV-Recap can summarize hours of footage shot by static CCTV cameras into a <u>short clip</u> that shows all interesting events simultaneously. The program identifies and tracks all moving objects present in the video and overlays these events on a single clip, while also showing the timestamps for each event, thus letting the user perform surveillance for multiple events.
 
-<div align="center"><img src="/images/cctvRecap.png"/></div>
+<div align="center"><img src="/images/cctvRecap.png"/></div>  
+
 ### Working
 
 * ##### Background Extraction: 
