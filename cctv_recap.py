@@ -84,7 +84,7 @@ with progressbar.ProgressBar(max_value=total_frames) as bar:
                 
                 cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
             
-            cv2.imshow('rgb', frame)
+            # cv2.imshow('rgb', frame)
             
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
@@ -314,6 +314,7 @@ cv2.destroyAllWindows()
 cap.release()
 
 print("Done!!")
+print("Summary video is available at " + filename + '_summary.avi')
 
 # In[ ]:
 
