@@ -25,7 +25,7 @@ cap  = cv2.VideoCapture(VID_PATH)
 fps = int(cap.get(cv2.CAP_PROP_FPS))
 total_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
 
-CONTINUITY_THRESHOLD = fps*2 #For cutting out boxes
+CONTINUITY_THRESHOLD = fps #For cutting out boxes
 
 MIN_SECONDS =  4# (seconds) Minimum duration of a moving object
 
